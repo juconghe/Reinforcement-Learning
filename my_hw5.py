@@ -28,16 +28,13 @@ def policy_iteration(mdp, gamma=1, iters=5, plot=True):
                 transition_dict = mdp.P_snexts(current_state,a)
                 for next_state, transition_p in transition_dict.items():
                     if mdp.is_absorbing(next_state):
-                        action2U[a] = mdp.R(current_state)
+                        action2U[a] = mdp.R(next_state)
                     else:
                         updated_value = transition_p * U[next_state]
                         action2U[a] += updated_value
             max_policy = max(action2U,key=action2U.get)
             pi[current_state] = max_policy
-            if mdp.is_terminal(current_state):
-                tempU[current_state] = mdp.R(current_state)
-            else:
-                tempU[current_state] = mdp.R(current_state) + gamma * action2U[max_policy]
+            tempU[current_state] = mdp.R(current_state) + gamma * action2U[max_policy]
         U = tempU
         start_idx = mdp.loc2state[mdp.start]
         Ustart.append(U[start_idx])
@@ -231,7 +228,7 @@ if __name__ == '__main__':
     env = GridWorld()
     mdp = GridWorld_MDP()
 
-    U, pi, Ustart = policy_iteration(mdp, iters=10,plot=True)
+    U, pi, Ustart = policy_iteration(mdp,gamma=1,iters=50,plot=True)
     print(U)
     for i in range(len(pi)):
         print(mdp.state2loc[i], mdp.action_str[pi[i]])
