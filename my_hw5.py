@@ -1,5 +1,6 @@
 from gridworld import GridWorld, GridWorld_MDP
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from collections import defaultdict
@@ -91,10 +92,13 @@ def td_update(v, s1, r, s2, terminal, alpha, gamma):
     :param gamma: discount factor
     :return: Nothing
     '''
-    # TODO implement the TD Update
     # you should update the value function v inplace (does not need to be returned)
-    pass
-
+    if s1 == 9 or s1 == 10:
+        print('updating s1')
+    if terminal:
+        v[s1] = r
+    else:
+        v[s1] = v[s1] + alpha*(r + gamma*v[s2] - v[s1])
 
 def td_episode(env, pi, v, gamma, alpha, max_steps=1000):
     '''
@@ -109,15 +113,27 @@ def td_episode(env, pi, v, gamma, alpha, max_steps=1000):
     :return: two floats G, v0 where G is the discounted return and v0 is the value function of the initial state (before learning)
     '''
     G = 0.
-    v0 = 0.
+    v0 = v[env.get_state()]
 
-    # TODO implement the agent interacting with the environment for one episode
     # episode ends when max_steps have been completed
     # episode ends when env is in the absorbing state
     # Learning should be done online (after every step)
     # return the discounted sum of rewards G, and the value function's estimate from the initial state v0
     # the value function estimate should be before any learn takes place in this episode
 
+    for t in range(max_steps):
+        if env.is_absorbing():
+            env.reset_to_start()
+            return G, v0
+        else:
+            current_state = env.get_state()
+            is_terminal = env.is_terminal()
+            action = pi[current_state]
+            reward = env.Act(action)
+            G += math.pow(gamma, t+1) * reward
+            next_state = env.get_state()
+            td_update(v, current_state, reward, next_state, is_terminal, alpha, gamma)
+    env.reset_to_start()
     return G, v0
 
 
@@ -135,8 +151,11 @@ def td_learning(env, pi, gamma, alpha, episodes=200, plot=True):
     '''
     returns, estimates = [], []
     v = np.zeros(env.num_states)
+    for e in range(episodes):
+        discounted_sum, temp_estimate = td_episode(env, pi, v, gamma, alpha)
+        returns.append(discounted_sum)
+        estimates.append(temp_estimate)
 
-    # TODO Implement the td learning for every episode
     # value function should start at 0 for all states
     # return the list of returns, and list of estimates for all episodes
     # also return the value function v
@@ -256,7 +275,6 @@ if __name__ == '__main__':
 
     U, pi, Ustart = policy_iteration(mdp, gamma=1, plot=True)
     print(U)
-    for i in range(len(pi)):
-        print(mdp.state2loc[i], mdp.action_str[pi[i]])
-    # vret, vest, v = td_learning(env, pi, gamma=1., alpha=0.1, episodes=2000, plot=True)
+    vret, vest, v = td_learning(env, pi, gamma=1., alpha=0.1, episodes=2000, plot=True)
+    print(v)
     # qret, qest, q = q_learning(env, eps=0.1, gamma=1., alpha=0.1, episodes=20000, plot=True)
