@@ -4,11 +4,11 @@ import math
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from collections import defaultdict
-
+import random
 
 def update_matrix(mdp, m, s, a):
     transition_dict = mdp.P_snexts(s, a)
-    m[s,:] = np.zeros(mdp.num_states)
+    m[s, :] = np.zeros(mdp.num_states)
     for next_state, transition_p in transition_dict.items():
         if not mdp.is_absorbing(next_state):
             m[s, next_state] = transition_p
@@ -41,23 +41,23 @@ def policy_iteration(mdp, gamma=1, iters=5, plot=True):
     for itr in range(iters):
         # policy evaluation
         b = [mdp.R(s) for s in mdp.S()]
-        A = identity_matrix - gamma*matrix
+        A = identity_matrix - gamma * matrix
         A_inverse = np.linalg.pinv(A)
-        U = np.dot(A_inverse,b)
+        U = np.dot(A_inverse, b)
 
         # policy improvement
         for current_state in mdp.S():
             action2U = defaultdict(float)
             for a in mdp.A(current_state):
-                transition_dict = mdp.P_snexts(current_state,a)
+                transition_dict = mdp.P_snexts(current_state, a)
                 for next_state, transition_p in transition_dict.items():
                     if mdp.is_absorbing(next_state):
                         action2U[a] = mdp.R(next_state)
                     else:
                         updated_value = transition_p * U[next_state]
                         action2U[a] += updated_value
-            max_policy = max(action2U,key=action2U.get)
-            update_matrix(mdp,matrix,current_state,max_policy)
+            max_policy = max(action2U, key=action2U.get)
+            update_matrix(mdp, matrix, current_state, max_policy)
             pi[current_state] = max_policy
         start_idx = mdp.loc2state[mdp.start]
         Ustart.append(U[start_idx])
@@ -93,12 +93,11 @@ def td_update(v, s1, r, s2, terminal, alpha, gamma):
     :return: Nothing
     '''
     # you should update the value function v inplace (does not need to be returned)
-    if s1 == 9 or s1 == 10:
-        print('updating s1')
     if terminal:
         v[s1] = r
     else:
-        v[s1] = v[s1] + alpha*(r + gamma*v[s2] - v[s1])
+        v[s1] = v[s1] + alpha * (r + gamma * v[s2] - v[s1])
+
 
 def td_episode(env, pi, v, gamma, alpha, max_steps=1000):
     '''
@@ -130,7 +129,7 @@ def td_episode(env, pi, v, gamma, alpha, max_steps=1000):
             is_terminal = env.is_terminal()
             action = pi[current_state]
             reward = env.Act(action)
-            G += math.pow(gamma, t+1) * reward
+            G += math.pow(gamma, t + 1) * reward
             next_state = env.get_state()
             td_update(v, current_state, reward, next_state, is_terminal, alpha, gamma)
     env.reset_to_start()
@@ -187,10 +186,18 @@ def egreedy(q, s, eps):
     :return: an integer representing the action
     '''
 
-    # TODO implement epsilon greedy action selection
-
-    return 0
-
+    p = random.random()
+    action_list = range(q.shape[1])
+    if p <= eps:
+        return random.choice(action_list)
+    else:
+        max_value = q[s,:][0]
+        max_action = 0
+        for i in range(q.shape[1]):
+            if q[s,i] > max_value:
+                max_value = q[s,i]
+                max_action = i
+        return max_action
 
 def q_update(q, s1, a, r, s2, terminal, alpha, gamma):
     '''
@@ -207,9 +214,12 @@ def q_update(q, s1, a, r, s2, terminal, alpha, gamma):
     :return: None
     '''
 
-    # TODO implement Q learning update rule
     # update should be done inplace (not returned)
-    pass
+    if terminal:
+        q[s1,a] = r
+    else:
+        max_value = max(q[s2,:])
+        q[s1,a] = q[s1,a] + alpha * (r + gamma * max_value - q[s1,a])
 
 
 def q_episode(env, q, eps, gamma, alpha, max_steps=1000):
@@ -225,11 +235,21 @@ def q_episode(env, q, eps, gamma, alpha, max_steps=1000):
     :return: two floats: G, q0 which are the discounted return and the estimate of the return from the initial state
     '''
     G = 0.
-    q0 = 0.
+    q0 = max(q[env.get_state(),:])
 
-    # TODO implement agent interaction for q learning with epsilon greedy action selection
     # Return G the discounted some of rewards and q0 the estimate of G from the initial state
-
+    for t in range(max_steps):
+        if env.is_absorbing():
+            env.reset_to_start()
+        else:
+            current_state = env.get_state()
+            is_terminal = env.is_terminal()
+            action = egreedy(q,current_state, eps)
+            reward = env.Act(action)
+            G += math.pow(gamma, t + 1) * reward
+            next_state = env.get_state()
+            q_update(q, current_state, action, reward, next_state, is_terminal, alpha, gamma)
+    env.reset_to_start()
     return G, q0
 
 
@@ -248,7 +268,11 @@ def q_learning(env, eps, gamma, alpha, episodes=200, plot=True):
     returns, estimates = [], []
     q = np.zeros((env.num_states, env.num_actions))
 
-    # TODO implement Q learning over episodes
+    for e in range(episodes):
+        # print('episode {}'.format(e))
+        discounted_sum, temp_estimate = q_episode(env, q, eps, gamma, alpha)
+        returns.append(discounted_sum)
+        estimates.append(temp_estimate)
     # return the returns and estimates for each episode and the Q table
 
     if plot:
@@ -277,4 +301,5 @@ if __name__ == '__main__':
     print(U)
     vret, vest, v = td_learning(env, pi, gamma=1., alpha=0.1, episodes=2000, plot=True)
     print(v)
-    # qret, qest, q = q_learning(env, eps=0.1, gamma=1., alpha=0.1, episodes=20000, plot=True)
+    qret, qest, q = q_learning(env, eps=0.1, gamma=1., alpha=0.1, episodes=20000, plot=True)
+    print(q)
