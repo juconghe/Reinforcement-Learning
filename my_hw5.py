@@ -4,6 +4,22 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from collections import defaultdict
 
+
+def update_matrix(mdp, m, s, a):
+    transition_dict = mdp.P_snexts(s, a)
+    m[s,:] = np.zeros(mdp.num_states)
+    for next_state, transition_p in transition_dict.items():
+        if not mdp.is_absorbing(next_state):
+            m[s, next_state] = transition_p
+
+
+def init_matrix(mdp, policy):
+    matrix = np.zeros((mdp.num_states, mdp.num_states))
+    for i in range(len(policy)):
+        update_matrix(mdp, matrix, i, policy[i])
+    return matrix
+
+
 def policy_iteration(mdp, gamma=1, iters=5, plot=True):
     '''
     Performs policy iteration on an mdp and returns the value function and policy 
@@ -19,9 +35,16 @@ def policy_iteration(mdp, gamma=1, iters=5, plot=True):
     pi = np.zeros(mdp.num_states, dtype=np.int)
     U = np.zeros(mdp.num_states)
     Ustart = []
-
+    identity_matrix = np.eye(11)
+    matrix = init_matrix(mdp, pi)
     for itr in range(iters):
-        tempU = np.zeros(mdp.num_states)
+        # policy evaluation
+        b = [mdp.R(s) for s in mdp.S()]
+        A = identity_matrix - gamma*matrix
+        A_inverse = np.linalg.pinv(A)
+        U = np.dot(A_inverse,b)
+
+        # policy improvement
         for current_state in mdp.S():
             action2U = defaultdict(float)
             for a in mdp.A(current_state):
@@ -33,9 +56,8 @@ def policy_iteration(mdp, gamma=1, iters=5, plot=True):
                         updated_value = transition_p * U[next_state]
                         action2U[a] += updated_value
             max_policy = max(action2U,key=action2U.get)
+            update_matrix(mdp,matrix,current_state,max_policy)
             pi[current_state] = max_policy
-            tempU[current_state] = mdp.R(current_state) + gamma * action2U[max_policy]
-        U = tempU
         start_idx = mdp.loc2state[mdp.start]
         Ustart.append(U[start_idx])
 
@@ -52,7 +74,7 @@ def policy_iteration(mdp, gamma=1, iters=5, plot=True):
         plt.close()
         pp.close()
 
-    #U and pi should be returned with the shapes and types specified
+    # U and pi should be returned with the shapes and types specified
     return U, pi, np.array(Ustart)
 
 
@@ -69,8 +91,8 @@ def td_update(v, s1, r, s2, terminal, alpha, gamma):
     :param gamma: discount factor
     :return: Nothing
     '''
-    #TODO implement the TD Update
-    #you should update the value function v inplace (does not need to be returned)
+    # TODO implement the TD Update
+    # you should update the value function v inplace (does not need to be returned)
     pass
 
 
@@ -89,7 +111,7 @@ def td_episode(env, pi, v, gamma, alpha, max_steps=1000):
     G = 0.
     v0 = 0.
 
-    #TODO implement the agent interacting with the environment for one episode
+    # TODO implement the agent interacting with the environment for one episode
     # episode ends when max_steps have been completed
     # episode ends when env is in the absorbing state
     # Learning should be done online (after every step)
@@ -97,6 +119,7 @@ def td_episode(env, pi, v, gamma, alpha, max_steps=1000):
     # the value function estimate should be before any learn takes place in this episode
 
     return G, v0
+
 
 def td_learning(env, pi, gamma, alpha, episodes=200, plot=True):
     '''
@@ -135,6 +158,7 @@ def td_learning(env, pi, gamma, alpha, episodes=200, plot=True):
 
     return returns, estimates, v
 
+
 def egreedy(q, s, eps):
     '''
     Epsilon greedy action selection for a discrete Q function.
@@ -147,6 +171,7 @@ def egreedy(q, s, eps):
     # TODO implement epsilon greedy action selection
 
     return 0
+
 
 def q_update(q, s1, a, r, s2, terminal, alpha, gamma):
     '''
@@ -167,6 +192,7 @@ def q_update(q, s1, a, r, s2, terminal, alpha, gamma):
     # update should be done inplace (not returned)
     pass
 
+
 def q_episode(env, q, eps, gamma, alpha, max_steps=1000):
     '''
     Agent interacts with the environment for an episode update the state action value function
@@ -186,6 +212,7 @@ def q_episode(env, q, eps, gamma, alpha, max_steps=1000):
     # Return G the discounted some of rewards and q0 the estimate of G from the initial state
 
     return G, q0
+
 
 def q_learning(env, eps, gamma, alpha, episodes=200, plot=True):
     '''
@@ -223,12 +250,11 @@ def q_learning(env, eps, gamma, alpha, episodes=200, plot=True):
     return returns, estimates, q
 
 
-
 if __name__ == '__main__':
     env = GridWorld()
     mdp = GridWorld_MDP()
 
-    U, pi, Ustart = policy_iteration(mdp,gamma=1,iters=50,plot=True)
+    U, pi, Ustart = policy_iteration(mdp, gamma=1, plot=True)
     print(U)
     for i in range(len(pi)):
         print(mdp.state2loc[i], mdp.action_str[pi[i]])
