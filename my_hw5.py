@@ -241,6 +241,7 @@ def q_episode(env, q, eps, gamma, alpha, max_steps=1000):
     for t in range(max_steps):
         if env.is_absorbing():
             env.reset_to_start()
+            return G, q0
         else:
             current_state = env.get_state()
             is_terminal = env.is_terminal()
